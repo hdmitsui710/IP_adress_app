@@ -1,1 +1,449 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>DNSたんけん | 名前とIPアドレスをつなぐしくみ</title>
+<meta name="description" content="高校1年生向けのネットワーク教材。ドメイン名・ホスト名とIPアドレスの関係、DNSサーバの働き、DNSサーバのネットワーク上の位置を、図とシミュレーションで学べます。">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Ccircle cx='16' cy='16' r='11' fill='white' stroke='%23087F6E' stroke-width='6'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=BIZ+UDPGothic:wght@400;700&family=IBM+Plex+Mono:wght@500;600&family=Zen+Maru+Gothic:wght@500;700;900&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+<script src="script.js" defer></script>
+</head>
+<body>
+<a class="skip" href="#main">本文へ移動</a>
 
+<!-- 図で使うアイコン -->
+<svg class="sprite" aria-hidden="true" focusable="false" width="0" height="0">
+  <defs>
+    <symbol id="ic-pc" viewBox="0 0 40 32">
+      <rect x="3" y="2" width="34" height="21" rx="3" fill="none" stroke="currentColor" stroke-width="2.6"/>
+      <path d="M13 29h14M20 23v6" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"/>
+    </symbol>
+    <symbol id="ic-phone" viewBox="0 0 40 32">
+      <rect x="12" y="1.5" width="16" height="29" rx="3.5" fill="none" stroke="currentColor" stroke-width="2.6"/>
+      <circle cx="20" cy="25.5" r="1.5" fill="currentColor"/>
+    </symbol>
+    <symbol id="ic-router" viewBox="0 0 40 32">
+      <rect x="3" y="17" width="34" height="11" rx="3" fill="none" stroke="currentColor" stroke-width="2.6"/>
+      <path d="M10 17L7 5M30 17l3-12" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"/>
+      <circle cx="11" cy="22.5" r="1.6" fill="currentColor"/>
+      <circle cx="17" cy="22.5" r="1.6" fill="currentColor"/>
+    </symbol>
+    <symbol id="ic-server" viewBox="0 0 40 32">
+      <rect x="5" y="2" width="30" height="8" rx="2.2" fill="none" stroke="currentColor" stroke-width="2.4"/>
+      <rect x="5" y="12" width="30" height="8" rx="2.2" fill="none" stroke="currentColor" stroke-width="2.4"/>
+      <rect x="5" y="22" width="30" height="8" rx="2.2" fill="none" stroke="currentColor" stroke-width="2.4"/>
+      <circle cx="11" cy="6" r="1.5" fill="currentColor"/>
+      <circle cx="11" cy="16" r="1.5" fill="currentColor"/>
+      <circle cx="11" cy="26" r="1.5" fill="currentColor"/>
+    </symbol>
+  </defs>
+</svg>
+
+<header class="topbar">
+  <div class="wrap topbar-in">
+    <a class="brand" href="#top"><span class="brand-dot" aria-hidden="true"></span>DNSたんけん</a>
+    <nav aria-label="ページ内の目次">
+      <ul class="toc">
+        <li><a href="#s1" data-sec="s1"><b>1</b>名前と番号</a></li>
+        <li><a href="#s2" data-sec="s2"><b>2</b>ホスト名とドメイン名</a></li>
+        <li><a href="#s3" data-sec="s3"><b>3</b>DNSサーバの働き</a></li>
+        <li><a href="#s4" data-sec="s4"><b>4</b>DNSサーバの場所</a></li>
+        <li><a href="#s5" data-sec="s5"><b>5</b>まとめ・クイズ</a></li>
+      </ul>
+    </nav>
+  </div>
+</header>
+
+<main id="main">
+
+  <!-- ===== ヒーロー：案内板 ===== -->
+  <section class="hero" id="top">
+    <div class="wrap">
+      <h1>「名前」を入れるだけで、<br>なぜ目的のサイトに着けるの?</h1>
+      <p class="lead">その裏では、<strong>DNS(ディーエヌエス)</strong>というしくみが、名前を<strong>IPアドレス(番号)</strong>に変えています。まずは下の案内板で、名前が番号に変わる瞬間を見てみましょう。</p>
+
+      <p class="pick-label" id="pickLabel">調べたい名前を選んでね</p>
+      <div class="chips" data-chips aria-labelledby="pickLabel"></div>
+
+      <div class="board" role="group" aria-label="DNS案内板">
+        <div class="board-row">
+          <div class="board-cell">
+            <span class="board-label">名前(ホスト名 + ドメイン名)</span>
+            <span class="board-name" id="boardName">www.example.jp</span>
+          </div>
+          <div class="board-mid" aria-hidden="true">
+            <span class="pill">DNS</span>
+            <span class="rail"></span>
+          </div>
+          <div class="board-cell">
+            <span class="board-label">番号(IPアドレス)</span>
+            <span class="board-ip" id="boardIp" aria-hidden="true">203.0.113.10</span>
+          </div>
+        </div>
+        <p class="sr-only" id="boardLive" aria-live="polite"></p>
+      </div>
+
+      <a class="hero-next" href="#s1">しくみを見ていこう</a>
+    </div>
+  </section>
+
+  <!-- ===== 1. 名前と番号 ===== -->
+  <section class="station" id="s1" aria-labelledby="h-s1">
+    <header class="s-head"><span class="mark" aria-hidden="true">1</span><h2 id="h-s1">ネットでは「番号」が住所。「名前」は呼び名</h2></header>
+
+    <div class="prose">
+      <p>コンピュータ同士が通信するとき、相手を見つける手がかりになるのは <strong>IPアドレス</strong>(番号)です。でも「203.0.113.10」のような数字は、人間には覚えにくいですよね。</p>
+      <p>そこで人間向けに、文字でできた<strong>ドメイン名</strong>(名前)がつけられています。スマホの連絡先アプリで「田中さん」と選ぶだけで電話がかけられるのと、同じ考え方です。</p>
+    </div>
+
+    <div class="scroll-x">
+      <table class="pair">
+        <caption class="sr-only">名前と番号の対応の例</caption>
+        <thead>
+          <tr><th scope="col">場面</th><th scope="col">名前</th><th scope="col"><span class="sr-only">対応</span></th><th scope="col">番号</th><th scope="col">対応を調べてくれるもの</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <th scope="row">スマホ</th>
+            <td class="n">田中さん</td>
+            <td class="sw" aria-hidden="true">⇄</td>
+            <td class="code">090-XXXX-XXXX</td>
+            <td>連絡先アプリ</td>
+          </tr>
+          <tr class="is-net">
+            <th scope="row">インターネット</th>
+            <td class="code">www.example.jp</td>
+            <td class="sw" aria-hidden="true">⇄</td>
+            <td class="code">203.0.113.10</td>
+            <td><strong>DNSサーバ</strong></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="terms">
+      <div class="term" style="--c:var(--c-domain)">
+        <h3>ドメイン名・ホスト名(名前)</h3>
+        <p>文字でできていて、人間が読みやすく覚えやすい。<br><code>www.example.jp</code> のような形です。</p>
+      </div>
+      <div class="term" style="--c:var(--c-tld)">
+        <h3>IPアドレス(番号)</h3>
+        <p>ネットワークにつながった機器の番号。0〜255の数字を4つ、「.」でつないだ形です。コンピュータ同士は、この番号で通信します。</p>
+      </div>
+    </div>
+
+    <p class="note"><strong>ひとこと：</strong>最近は、もっと長い「IPv6」という番号も使われています。この教材では、4つの数字でできた「IPv4」で説明します。</p>
+  </section>
+
+  <!-- ===== 2. ホスト名とドメイン名 ===== -->
+  <section class="station" id="s2" aria-labelledby="h-s2">
+    <header class="s-head"><span class="mark" aria-hidden="true">2</span><h2 id="h-s2">ホスト名・ドメイン名・IPアドレスの関係</h2></header>
+
+    <div class="prose">
+      <p>人の名前にたとえると、<strong>ホスト名</strong>が「下の名前」、<strong>ドメイン名</strong>が「名字」です。同じ名字(ドメイン)の中で、下の名前(ホスト名)を使って、だれのことかを区別します。</p>
+      <p>下の一覧から名前を選ぶと、名前がどう分かれるか、そしてどのIPアドレスに対応するかが表示されます。</p>
+    </div>
+
+    <div class="anatomy" id="anatomy"></div>
+
+    <dl class="parts">
+      <div style="--c:var(--c-host)"><dt>ホスト名</dt><dd>ネットワークにつながった<strong>1台1台のコンピュータ</strong>につける名前。<code>www</code> は Webサーバ、<code>mail</code> はメールサーバ、のように役割を表すことが多い。</dd></div>
+      <div style="--c:var(--c-domain)"><dt>ドメイン名</dt><dd>コンピュータたちが所属する<strong>グループの名前</strong>。<code>example</code> は組織や会社の名前、<code>jp</code> は「TLD(トップレベルドメイン)」といって、国や種類を表す(<code>jp</code>=日本、<code>com</code>=企業など)。</dd></div>
+      <div style="--c:var(--ink)"><dt>FQDN</dt><dd>ホスト名とドメイン名をつなげた、<strong>世界で1つに決まる名前</strong>のこと(完全修飾ドメイン名)。<code>www.example.jp</code> がその例。</dd></div>
+    </dl>
+
+    <div class="map">
+      <p class="map-title" id="mapTitle">DNSサーバがもっている「対応表」のイメージ(行を押すと選べます)</p>
+      <div class="dgroups" id="mapping" aria-labelledby="mapTitle"></div>
+    </div>
+
+    <ul class="points">
+      <li>同じドメイン(<code>example.jp</code>)の中でも、ホスト名がちがえば<strong>別のコンピュータ</strong>。だからIPアドレスもちがいます。</li>
+      <li>ホスト名が同じ <code>www</code> でも、ドメインがちがえば<strong>別のもの</strong>です。<code>www.example.jp</code> と <code>www.example.com</code> は別のコンピュータです。</li>
+      <li>読む順番に注意。住所は「日本 → 東京都 → ○○区」と大きい方から書きますが、名前は逆で、<strong>小さい方(ホスト名)から</strong>書きます。</li>
+    </ul>
+  </section>
+
+  <!-- ===== 3. DNSサーバの働き ===== -->
+  <section class="station" id="s3" aria-labelledby="h-s3">
+    <header class="s-head"><span class="mark" aria-hidden="true">3</span><h2 id="h-s3">DNSサーバの働き:名前から番号を調べる案内係</h2></header>
+
+    <div class="prose">
+      <p><strong>DNSサーバ</strong>は、ドメイン名に対応するIPアドレスを調べて教えてくれる、ネットワークの「案内係」です。DNS は Domain Name System(ドメイン・ネーム・システム)の略です。</p>
+      <p>下のシミュレーターで、名前が番号に変わるまでの流れを1ステップずつ見てみましょう。</p>
+    </div>
+
+    <div class="sim">
+      <div class="sim-controls">
+        <div class="ctl">
+          <span class="ctl-label" id="simPick">調べる名前</span>
+          <div class="chips" data-chips aria-labelledby="simPick"></div>
+        </div>
+        <div class="ctl">
+          <span class="ctl-label" id="simModeLabel">表示</span>
+          <div class="seg" role="group" aria-labelledby="simModeLabel">
+            <button type="button" data-mode="simple" aria-pressed="true">かんたん版</button>
+            <button type="button" data-mode="detail" aria-pressed="false">くわしい版</button>
+          </div>
+        </div>
+        <label class="check"><input type="checkbox" id="cacheToggle">前にも調べたことがある(キャッシュ)</label>
+      </div>
+
+      <div class="scroll-x">
+        <svg class="flow" id="flow" viewBox="0 0 920 500" role="img" aria-label="DNSの問い合わせの流れを示す図。左にPCとWebサーバ、中央にDNSサーバ、右にルート・TLD・権威のDNSサーバがある。くわしい流れは図の下のステップ説明で読めます。">
+          <g class="edges">
+            <line class="edge" data-edge="dns-pc"   x1="95"  y1="240" x2="460" y2="240"/>
+            <line class="edge" data-edge="dns-root" x1="460" y1="240" x2="825" y2="70"/>
+            <line class="edge" data-edge="dns-tld"  x1="460" y1="240" x2="825" y2="240"/>
+            <line class="edge" data-edge="auth-dns" x1="460" y1="240" x2="825" y2="410"/>
+            <line class="edge" data-edge="pc-web"   x1="95"  y1="240" x2="95"  y2="430"/>
+          </g>
+
+          <g class="node node-pc" data-node="pc" transform="translate(20,198)">
+            <rect class="box" width="150" height="84" rx="14"/>
+            <use class="ic" href="#ic-pc" x="55" y="8" width="40" height="32"/>
+            <text class="n-title" x="75" y="58">あなたのPC</text>
+            <text class="n-sub" x="75" y="75" id="pcSub">ブラウザ</text>
+          </g>
+          <g class="node node-dns" data-node="dns" transform="translate(385,198)">
+            <rect class="box" width="150" height="84" rx="14"/>
+            <use class="ic" href="#ic-server" x="55" y="8" width="40" height="32"/>
+            <text class="n-title" x="75" y="58">DNSサーバ</text>
+            <text class="n-sub" x="75" y="75">キャッシュDNSサーバ</text>
+          </g>
+          <g class="node node-root" data-node="root" transform="translate(750,28)">
+            <rect class="box" width="150" height="84" rx="14"/>
+            <use class="ic" href="#ic-server" x="55" y="8" width="40" height="32"/>
+            <text class="n-title" x="75" y="58">ルートDNS</text>
+            <text class="n-sub" x="75" y="75">いちばん上</text>
+          </g>
+          <g class="node node-tld" data-node="tld" transform="translate(750,198)">
+            <rect class="box" width="150" height="84" rx="14"/>
+            <use class="ic" href="#ic-server" x="55" y="8" width="40" height="32"/>
+            <text class="n-title" x="75" y="58" id="tldTitle">.jpのDNS</text>
+            <text class="n-sub" x="75" y="75" id="tldSub">.jp の担当</text>
+          </g>
+          <g class="node node-auth" data-node="auth" transform="translate(750,368)">
+            <rect class="box" width="150" height="84" rx="14"/>
+            <use class="ic" href="#ic-server" x="55" y="8" width="40" height="32"/>
+            <text class="n-title" x="75" y="58">権威DNS</text>
+            <text class="n-sub" x="75" y="75" id="authSub">example.jp の担当</text>
+          </g>
+          <g class="node node-web" data-node="web" transform="translate(20,388)">
+            <rect class="box" width="150" height="84" rx="14"/>
+            <use class="ic" href="#ic-server" x="55" y="8" width="40" height="32"/>
+            <text class="n-title" x="75" y="58" id="webTitle">Webサーバ</text>
+            <text class="n-sub" x="75" y="75" id="webSub">www.example.jp</text>
+          </g>
+
+          <g id="packet" class="packet is-hidden" aria-hidden="true">
+            <rect id="pRect" class="p-box" y="-13" height="26" rx="13"/>
+            <text id="pText" y="1"></text>
+          </g>
+          <g id="badge" class="badge is-hidden" transform="translate(460,172)" aria-hidden="true">
+            <rect id="bRect" class="b-box" y="-13" height="26" rx="13"/>
+            <text id="bText" y="1"></text>
+          </g>
+        </svg>
+      </div>
+      <p class="scroll-hint">図は横にスクロールできます。</p>
+
+      <div class="key" aria-label="図の色の意味">
+        <span><i style="--c:var(--c-pc)"></i>あなたのPC</span>
+        <span><i style="--c:var(--c-dns)"></i>いつも聞くDNSサーバ(キャッシュDNS)</span>
+        <span><i style="--c:var(--c-root)"></i>ルートDNS</span>
+        <span><i style="--c:var(--c-tld)"></i>TLDのDNS</span>
+        <span><i style="--c:var(--c-auth)"></i>権威DNS</span>
+        <span><i style="--c:var(--c-web)"></i>Webサーバなど</span>
+      </div>
+
+      <div class="sim-bottom">
+        <div class="now">
+          <p class="step-no" id="stepNo">ステップ 1 / 5</p>
+          <h3 class="step-title" id="stepTitle"></h3>
+          <p class="step-text" id="stepText" aria-live="polite"></p>
+          <div class="sim-btns">
+            <button type="button" class="btn" id="prevBtn">前へ</button>
+            <button type="button" class="btn btn-primary" id="nextBtn">次へ</button>
+            <button type="button" class="btn" id="playBtn">自動で進める</button>
+            <button type="button" class="btn" id="resetBtn">最初から</button>
+          </div>
+        </div>
+        <ol class="steps" id="stepList" aria-label="ステップ一覧"></ol>
+      </div>
+    </div>
+
+    <ul class="points">
+      <li>PCは、まず<strong>身近なDNSサーバ</strong>に「この名前のIPアドレスは?」と聞きます。</li>
+      <li>答えを知らないときは、DNSサーバが<strong>ほかのDNSサーバに順番に聞いて</strong>調べてくれます(「くわしい版」で確認できます)。</li>
+      <li>調べた答えは<strong>キャッシュ</strong>としてしばらく覚えておくので、2回目からは速く答えられます。</li>
+    </ul>
+  </section>
+
+  <!-- ===== 4. DNSサーバの場所 ===== -->
+  <section class="station" id="s4" aria-labelledby="h-s4">
+    <header class="s-head"><span class="mark" aria-hidden="true">4</span><h2 id="h-s4">DNSサーバは、ネットワークのどこにいる?</h2></header>
+
+    <div class="prose">
+      <p>DNSサーバも、ネットワークにつながった<strong>ふつうのコンピュータ(サーバ)</strong>です。IPアドレスをもっていて、名前を聞かれると答えを返します。ただし1台だけではなく、<strong>いろいろな場所に役割を分けて</strong>置かれています。</p>
+      <p>下のボタンで、DNSサーバがいる場所を光らせてみましょう。図の機器を押すと、説明も出ます。</p>
+    </div>
+
+    <div class="net-tools">
+      <button type="button" class="btn btn-primary" id="dnsFocusBtn" aria-pressed="false">DNSサーバをさがす</button>
+    </div>
+
+    <div class="net-wrap">
+      <div class="scroll-x">
+        <svg class="net" id="net" viewBox="0 0 920 480" role="group" aria-label="ネットワークの中でDNSサーバがある場所を示した図。機器を選ぶと説明が表示されます。">
+          <rect class="zone zone-a" x="10"  y="50" width="300" height="410" rx="18"/>
+          <rect class="zone zone-b" x="325" y="50" width="250" height="410" rx="18"/>
+          <rect class="zone zone-c" x="590" y="50" width="320" height="410" rx="18"/>
+          <text class="zone-title" x="28"  y="82">学校や家の中</text>
+          <text class="zone-sub"   x="28"  y="102">LAN(ローカルネットワーク)</text>
+          <text class="zone-title" x="343" y="82">プロバイダ</text>
+          <text class="zone-sub"   x="343" y="102">ISP(回線をつないでくれる会社)</text>
+          <text class="zone-title" x="608" y="82">インターネット</text>
+          <text class="zone-sub"   x="608" y="102">世界中のネットワークの集まり</text>
+
+          <g class="links">
+            <line class="edge dnsroute" x1="85"  y1="150" x2="235" y2="200"/>
+            <line class="edge edge-wifi dnsroute" x1="85"  y1="250" x2="235" y2="200"/>
+            <line class="edge dnsroute" x1="235" y1="200" x2="450" y2="340"/>
+            <line class="edge dnsroute" x1="450" y1="340" x2="450" y2="150"/>
+            <line class="edge dnsroute2" x1="450" y1="340" x2="645" y2="340"/>
+            <line class="edge dnsroute2" x1="645" y1="140" x2="645" y2="390"/>
+            <line class="edge dnsroute2" x1="645" y1="140" x2="795" y2="140"/>
+            <line class="edge dnsroute2" x1="645" y1="220" x2="795" y2="220"/>
+            <line class="edge dnsroute2" x1="645" y1="300" x2="795" y2="300"/>
+            <line class="edge" x1="645" y1="390" x2="795" y2="390"/>
+          </g>
+
+          <g class="net-node node-pc" data-node="pc" transform="translate(20,119)" role="button" tabindex="0" aria-label="PC の説明を見る">
+            <rect class="box" width="130" height="62" rx="12"/>
+            <use class="ic" href="#ic-pc" x="10" y="19" width="30" height="24"/>
+            <text class="n-title" x="48" y="27">PC</text>
+            <text class="n-sub" x="48" y="46">あなたの端末</text>
+          </g>
+          <g class="net-node node-pc" data-node="phone" transform="translate(20,219)" role="button" tabindex="0" aria-label="スマホ の説明を見る">
+            <rect class="box" width="130" height="62" rx="12"/>
+            <use class="ic" href="#ic-phone" x="10" y="19" width="30" height="24"/>
+            <text class="n-title" x="48" y="27">スマホ</text>
+            <text class="n-sub" x="48" y="46">Wi-Fi接続</text>
+          </g>
+          <g class="net-node node-relay is-relay" data-node="router" transform="translate(170,169)" role="button" tabindex="0" aria-label="ルータ の説明を見る">
+            <rect class="box" width="130" height="62" rx="12"/>
+            <use class="ic" href="#ic-router" x="10" y="19" width="30" height="24"/>
+            <text class="n-title" x="48" y="27">ルータ</text>
+            <text class="n-sub" x="48" y="46">LANの出入口</text>
+          </g>
+          <g class="net-node node-web" data-node="isp" transform="translate(375,309)" role="button" tabindex="0" aria-label="ISPの設備 の説明を見る">
+            <rect class="box" width="150" height="62" rx="12"/>
+            <use class="ic" href="#ic-router" x="10" y="19" width="30" height="24"/>
+            <text class="n-title" x="48" y="27">ISPの設備</text>
+            <text class="n-sub" x="48" y="46">ネットの入口</text>
+          </g>
+          <g class="net-node node-dns is-dns" data-node="cache" transform="translate(375,119)" role="button" tabindex="0" aria-label="キャッシュDNSサーバ の説明を見る">
+            <rect class="box" width="150" height="62" rx="12"/>
+            <use class="ic" href="#ic-server" x="10" y="19" width="30" height="24"/>
+            <text class="n-title" x="48" y="27">DNSサーバ</text>
+            <text class="n-sub" x="48" y="46">キャッシュ担当</text>
+          </g>
+          <g class="net-node node-root is-dns" data-node="root" transform="translate(715,109)" role="button" tabindex="0" aria-label="ルートDNSサーバ の説明を見る">
+            <rect class="box" width="160" height="62" rx="12"/>
+            <use class="ic" href="#ic-server" x="10" y="19" width="30" height="24"/>
+            <text class="n-title" x="48" y="27">ルートDNS</text>
+            <text class="n-sub" x="48" y="46">いちばん上</text>
+          </g>
+          <g class="net-node node-tld is-dns" data-node="tld" transform="translate(715,189)" role="button" tabindex="0" aria-label="TLDのDNSサーバ の説明を見る">
+            <rect class="box" width="160" height="62" rx="12"/>
+            <use class="ic" href="#ic-server" x="10" y="19" width="30" height="24"/>
+            <text class="n-title" x="48" y="27">TLDのDNS</text>
+            <text class="n-sub" x="48" y="46">.jp / .com など</text>
+          </g>
+          <g class="net-node node-auth is-dns" data-node="auth" transform="translate(715,269)" role="button" tabindex="0" aria-label="権威DNSサーバ の説明を見る">
+            <rect class="box" width="160" height="62" rx="12"/>
+            <use class="ic" href="#ic-server" x="10" y="19" width="30" height="24"/>
+            <text class="n-title" x="48" y="27">権威DNS</text>
+            <text class="n-sub" x="48" y="46">ドメインの担当</text>
+          </g>
+          <g class="net-node node-web" data-node="web" transform="translate(715,359)" role="button" tabindex="0" aria-label="Webサーバ の説明を見る">
+            <rect class="box" width="160" height="62" rx="12"/>
+            <use class="ic" href="#ic-server" x="10" y="19" width="30" height="24"/>
+            <text class="n-title" x="48" y="27">Webサーバ</text>
+            <text class="n-sub" x="48" y="46">最終的な目的地</text>
+          </g>
+        </svg>
+      </div>
+      <p class="scroll-hint">図は横にスクロールできます。</p>
+      <div class="net-info" id="netInfo" aria-live="polite">
+        <h3 id="netInfoTitle">図の機器を押してみよう</h3>
+        <p id="netInfoText">PC、ルータ、DNSサーバなど、押すと役割の説明が表示されます。</p>
+      </div>
+    </div>
+
+    <div class="where">
+      <div style="--c:var(--c-dns)">
+        <h3>身近な場所にいる:キャッシュDNSサーバ</h3>
+        <p>PCが最初に聞く相手です。プロバイダや学校の中に置かれています。家のルータが取り次いで、実際にはプロバイダのDNSサーバが答えることも多いです。</p>
+      </div>
+      <div style="--c:var(--c-root)">
+        <h3>インターネットの中にいる:ルート・TLD・権威DNSサーバ</h3>
+        <p>名前の階層(<code>.</code> → <code>jp</code> → <code>example.jp</code>)ごとに担当が分かれています。答えを知らないキャッシュDNSサーバが、上から順にたどって聞きにいきます。</p>
+      </div>
+      <div style="--c:var(--c-pc)">
+        <h3>PCの設定に書いてある:DNSサーバのIPアドレス</h3>
+        <p>PCには、聞く相手のDNSサーバの<strong>IPアドレス</strong>が設定されています。名前で書くと、その名前を調べるためにまたDNSが必要になってしまうので、数字で書いておきます。ふつうはネットにつなぐと自動で設定されます。</p>
+      </div>
+    </div>
+
+    <div class="try">
+      <h3>やってみよう:自分のPCが使っているDNSサーバを調べる</h3>
+      <div class="try-body">
+        <p>ターミナル(Windowsは「コマンドプロンプト」)で、次のコマンドを実行してみます。自分の学校のWebサイトの名前で試すと、本物のIPアドレスが出てきます。</p>
+        <div class="cmd"><code>nslookup 調べたい名前</code><button type="button" data-copy="nslookup " class="copy">コピー</button></div>
+        <p class="try-note">結果の最初に出る「Server(サーバー)」と「Address(アドレス)」が、あなたのPCが使っているDNSサーバです。Windowsなら <code>ipconfig /all</code> の「DNS サーバー」でも確認できます。<br>学校の端末では使えないことがあります。先生の指示にしたがってください。</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===== 5. まとめ・クイズ ===== -->
+  <section class="station" id="s5" aria-labelledby="h-s5">
+    <header class="s-head"><span class="mark" aria-hidden="true">5</span><h2 id="h-s5">まとめとクイズ</h2></header>
+
+    <ul class="points">
+      <li><strong>IPアドレス</strong>は、ネット上の住所(番号)。<strong>ドメイン名</strong>は、人間が覚えやすい名前。</li>
+      <li><strong>ホスト名</strong>(1台のコンピュータの名前)+ <strong>ドメイン名</strong>(グループの名前)で、世界で1つの名前(FQDN)になる。</li>
+      <li><strong>DNSサーバ</strong>は、名前に対応するIPアドレスを教えてくれる案内係。身近なDNSサーバから、インターネット上のDNSサーバまで、役割を分けて置かれている。</li>
+    </ul>
+
+    <dl class="gloss">
+      <div><dt>DNS</dt><dd>名前とIPアドレスを結びつけるしくみ(Domain Name System)。</dd></div>
+      <div><dt>DNSサーバ</dt><dd>名前の問い合わせに答えるコンピュータ。</dd></div>
+      <div><dt>キャッシュDNSサーバ</dt><dd>PCが最初に聞く相手。調べた答えを一時的に覚えておく。</dd></div>
+      <div><dt>権威DNSサーバ</dt><dd>ドメインの対応表を実際にもっている、正式な答えの出どころ。</dd></div>
+      <div><dt>ドメイン名</dt><dd>ホスト名の右側にある、グループの名前(例:example.jp)。</dd></div>
+      <div><dt>ホスト名</dt><dd>1台のコンピュータにつける名前(例:www)。</dd></div>
+      <div><dt>IPアドレス</dt><dd>機器の番号。0〜255の数字を4つ「.」でつなぐ(IPv4)。</dd></div>
+      <div><dt>キャッシュ</dt><dd>いちど調べた答えを、しばらく覚えておくこと。</dd></div>
+    </dl>
+
+    <h3 class="quiz-head">理解チェック</h3>
+    <div class="quiz" id="quiz"></div>
+    <div class="quiz-result" id="quizResult" aria-live="polite"></div>
+  </section>
+
+</main>
+
+<footer class="foot">
+  <div class="wrap">
+    <p>この教材で使っているドメイン名とIPアドレスは、説明用に作った架空のものです。実際のインターネットのようすとは少しちがいます。</p>
+  </div>
+</footer>
+
+</body>
+</html>
